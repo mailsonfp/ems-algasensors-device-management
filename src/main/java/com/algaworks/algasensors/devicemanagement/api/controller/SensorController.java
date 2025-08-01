@@ -1,6 +1,9 @@
 package com.algaworks.algasensors.devicemanagement.api.controller;
 
+import com.algaworks.algasensors.devicemanagement.api.client.SensorMonitoringClient;
+import com.algaworks.algasensors.devicemanagement.api.model.SensorDetailOutput;
 import com.algaworks.algasensors.devicemanagement.api.model.SensorInput;
+import com.algaworks.algasensors.devicemanagement.api.model.SensorMonitoringOutput;
 import com.algaworks.algasensors.devicemanagement.api.model.SensorOutput;
 import com.algaworks.algasensors.devicemanagement.common.IdGenerator;
 import com.algaworks.algasensors.devicemanagement.domain.model.Sensor;
@@ -29,6 +32,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class SensorController {
 
     private final SensorRepository sensorRepository;
+    private final SensorMonitoringClient sensorMonitoringClient;
 
     @GetMapping
     public Page<SensorOutput> search(@PageableDefault Pageable pageable) {
@@ -43,6 +47,20 @@ public class SensorController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
 
         return convertToModel(sensor);
+    }
+
+    @GetMapping("{sensorId}/detail")
+    public SensorDetailOutput getOneWithDetail(@PathVariable TSID sensorId){
+        Sensor sensor = sensorRepository.findById(new SensorId(sensorId))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+
+        SensorMonitoringOutput monitoringOutput = sensorMonitoringClient.getDetail(sensorId);
+        SensorOutput sensorOutput = convertToModel(sensor);
+
+        return SensorDetailOutput.builder()
+                .monitoring(monitoringOutput)
+                .sensor(sensorOutput)
+                .build();
     }
 
     @PostMapping
@@ -97,6 +115,8 @@ public class SensorController {
         sensor.setEnabled(true);
 
         sensorRepository.save(sensor);
+
+        sensorMonitoringClient.enableMonitoring(sensorId);
     }
 
     @DeleteMapping("/{sensorId}/enable")
@@ -108,6 +128,8 @@ public class SensorController {
         sensor.setEnabled(false);
 
         sensorRepository.save(sensor);
+
+        sensorMonitoringClient.disableMonitoring(sensorId);
     }
 
     private SensorOutput convertToModel(Sensor sensor) {
